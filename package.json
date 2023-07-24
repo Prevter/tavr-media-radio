@@ -1,0 +1,33 @@
+{
+  "name": "@prevter/tavr-media-radio",
+  "version": "1.0.0",
+  "description": "TAVR Media radio library for fetching radio stations' playlists",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc -d",
+    "test": "node test/index.js",
+    "build:test": "npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.4",
+    "typescript": "^5.1.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prevter/tavr-media-radio.git"
+  },
+  "author": "prevter",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/prevter/tavr-media-radio/issues"
+  },
+  "homepage": "https://github.com/prevter/tavr-media-radio#readme",
+  "files": [
+    "lib/**/*"
+  ],
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  }
+}
