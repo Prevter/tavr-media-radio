@@ -1,4 +1,7 @@
 # TAVR Media Radio Library
+![npm](https://img.shields.io/npm/v/%40prevter%2Ftavr-media-radio)
+![npm type definitions](https://img.shields.io/npm/types/%40prevter%2Ftavr-media-radio)
+![GitHub](https://img.shields.io/github/license/prevter/tavr-media-radio)  
 
 Library for fetching radio stations' playlists and metadata.
 
