@@ -14,23 +14,17 @@ radioPlayer.on(RadioPlayerEvent.Song, (song) => {
     console.log("New song playing:", song);
     /*
     {
-        stime: '18:07:23',
-        time: '18:07',
-        singer: 'Metro Boomin',
-        song: "Creepin' (feat. The Weeknd & 21 Savage)",
-        song_id: '3183',
-        singer_id: '1397',
-        song_url: 'https://www.hitfm.ua/music/1397-metro-boomin/3183-creepin-feat-the-weeknd-and-21-savage/',
-        singer_url: 'https://www.hitfm.ua/music/1397-metro-boomin/',
-        type: '',
-        video: '61ymOWwOwuk',
-        singer_img: 'https://www.hitfm.ua/static/img/content/music/1397/400x210.jpg',      
-        cover: 'https://www.hitfm.ua/static/img/content/cover/1397/500x500.jpg',
+        start_time: '15:32',
+        start_time_full: '15:32:28',
+        singer: 'СКАЙ',
+        song: 'Легковажна',
+        image: 'https://static.hitfm.ua/hitfm/img/cover/716/500x500.jpg',
+        url: 'https://www.youtube.com/watch?v=vvcmuEumLlA'
     }
     */
 });
 
-// Event on DJ change
+// Event on DJ change (works only for RadioStation.HitFM)
 radioPlayer.on(RadioPlayerEvent.DJ, (dj) => {
     console.log("New DJ:", dj);
     /*

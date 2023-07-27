@@ -1,16 +1,16 @@
-import { RadioStation, RadioPlayerURL } from "./stations";
+import { RadioStation, RadioPlayerURL, RadioCoverURL } from "./stations";
 import { EventEmitter } from "events";
 import https from "https";
 
 export class RadioPlayer {
   station: RadioStation;
+  coverURL: string;
   protected refreshTime: number;
   playlist?: RadioSong[];
   currentSong?: RadioSong;
   currentDJ?: RadioDJ;
   private _updateInterval?: number | NodeJS.Timer;
   private _eventManager: EventEmitter;
-  private _setDJEvent: boolean = false;
   private _setSongEvent: boolean = false;
 
   constructor(options: RadioPlayerOptions) {
@@ -18,6 +18,7 @@ export class RadioPlayer {
     if (!Object.values(RadioStation).includes(options.station))
       throw new Error("Invalid radio station");
     this.station = options.station;
+    this.coverURL = RadioCoverURL[this.station];
 
     this.refreshTime = options.refreshTime || 10000;
     if (isNaN(this.refreshTime) || this.refreshTime < 1000)
@@ -26,9 +27,7 @@ export class RadioPlayer {
     this._eventManager = new EventEmitter();
   }
 
-  /**
-   * Start updating the playlist data
-   */
+  /** Start updating the playlist data */
   start(): void {
     this._updateInterval = setInterval(() => {
       this.update();
@@ -36,9 +35,7 @@ export class RadioPlayer {
     this.update();
   }
 
-  /**
-   * Stop updating the playlist data
-   */
+  /** Stop updating the playlist data */
   stop(): void {
     if (!this._updateInterval) return;
     clearInterval(this._updateInterval);
@@ -55,32 +52,14 @@ export class RadioPlayer {
       // UnitedNews is a special case
       // It doesn't have a playlist, so we have to create a fake one
       if (this.station === RadioStation.UnitedNews) {
-        if (!this.currentDJ && this._setDJEvent) {
-          this.currentDJ = {
-            absnum: "0",
-            cur_time: "24/02/2022",
-            djType: "news",
-            end_time: "",
-            img: "https://play.tavr.media/static/image/united_news.jpg",
-            link: "",
-            title: "Єдині Новини",
-            player: this,
-          };
-          this._eventManager.emit(RadioPlayerEvent.DJ, this.currentDJ);
-        }
         if (!this.currentSong && this._setSongEvent) {
           this.currentSong = {
-            cover: "https://play.tavr.media/static/image/united_news.jpg",
+            start_time: "24/02/2022",
+            start_time_full: "24/02/2022",
             singer: "Єдині Новини",
-            singer_id: "",
-            singer_img: "https://play.tavr.media/static/image/united_news.jpg",
-            singer_url: "",
             song: "Інформаціний марафон 24/7",
-            song_id: "",
-            stime: "24/02/2022",
-            time: "24/02/2022",
-            type: "",
-            video: "",
+            image: RadioCoverURL.news,
+            url: null,
             player: this,
           };
           this.playlist = [this.currentSong];
@@ -115,7 +94,9 @@ export class RadioPlayer {
   private _parse(json: JSON): void {
     if (!Array.isArray(json)) throw new Error("Invalid response JSON");
 
-    const playlist: RadioSong[] = json.slice(0, 4);
+    const playlist: RadioSong[] = json
+      .slice(0, 4)
+      .map((s) => this._parseSong(s));
     const song = playlist[0];
     if (json[4]) {
       const dj: RadioDJ = json[4];
@@ -133,7 +114,7 @@ export class RadioPlayer {
       song.player = this;
     }
 
-    if (!this.currentSong || song.song_id !== this.currentSong.song_id) {
+    if (!this.currentSong || song.song !== this.currentSong.song) {
       this.currentSong = song;
       this._eventManager.emit(RadioPlayerEvent.Song, song);
     }
@@ -141,13 +122,66 @@ export class RadioPlayer {
     this.playlist = playlist;
   }
 
+  private _parseSong(song: any): RadioSong {
+    const mapped_keys: any = {
+      start_time: { type: "direct", keys: ["time"] },
+      start_time_full: { type: "direct", keys: ["stime", "time"] },
+      singer: { type: "direct", keys: ["singer"] },
+      song: { type: "direct", keys: ["song"] },
+      image: { type: "direct", keys: ["cover", "img"], default: this.coverURL },
+      url: {
+        type: "parse",
+        keys: [
+          {
+            name: "video",
+            parse: (value: string) => {
+              if (!value) return null;
+              return `https://www.youtube.com/watch?v=${value}`;
+            },
+          },
+          "song_url",
+        ],
+        default: null,
+      },
+    };
+
+    const result: any = { player: this };
+
+    for (const key in mapped_keys) {
+      const keyData = mapped_keys[key];
+      if (keyData.type === "direct") {
+        for (const k of keyData.keys) {
+          if (song[k]) {
+            result[key] = song[k];
+            break;
+          }
+        }
+      } else if (keyData.type === "parse") {
+        for (const k of keyData.keys) {
+          if (typeof k === "string") {
+            if (song[k]) {
+              result[key] = song[k];
+              break;
+            }
+          } else if (typeof k === "object") {
+            if (song[k.name]) {
+              result[key] = k.parse(song[k.name]);
+              break;
+            }
+          }
+        }
+      }
+      if (!result[key] && keyData.default) result[key] = keyData.default;
+    }
+
+    return result;
+  }
+
   /**
-   *
    * @param event Event name ({@link RadioPlayerEvent})
    * @param callback Function with any of the following arguments: {@link RadioSong}, {@link RadioDJ}, {@link Error}
    */
   on(event: RadioPlayerEvent, callback: (...args: any[]) => void): void {
-    if (event === RadioPlayerEvent.DJ) this._setDJEvent = true;
     if (event === RadioPlayerEvent.Song) this._setSongEvent = true;
     this._eventManager.on(event, callback);
   }
@@ -158,16 +192,12 @@ export class RadioPlayer {
    * @returns {string} Radio stream URL
    */
   getPlayerURL(hd?: boolean): string {
-    const stationKey = Object.keys(RadioStation).find(
-      (key) => (RadioStation as any)[key] === this.station
-    );
-
-    if (!stationKey) throw new Error("Invalid radio station");
-
-    const url = (RadioPlayerURL as any)[stationKey];
+    const url = RadioPlayerURL[this.station];
     if (!url) throw new Error("Invalid radio station");
 
-    if (hd) return url + "_HD";
+    // If HD is requested, append "_HD" to the URL
+    // (except for UnitedNews, which doesn't have an HD stream)
+    if (hd && this.station !== RadioStation.UnitedNews) return url + "_HD";
     return url;
   }
 
@@ -185,115 +215,57 @@ export class RadioPlayer {
 }
 
 interface RadioPlayerOptions {
-  /**
-   * Radio station
-   */
+  /** Radio station */
   station: RadioStation;
-  /**
-   * Playlist data refresh interval in milliseconds (minimum 1000)
-   */
+  /** Playlist data refresh interval in milliseconds (minimum 1000) */
   refreshTime?: number;
 }
 
 export enum RadioPlayerEvent {
-  /**
-   * Called when the current song changes
-   */
+  /** Called when the current song changes */
   Song = "song",
-  /**
-   * Called when the current DJ changes
-   */
+  /** Called when the current DJ changes */
   DJ = "dj",
-  /**
-   * Called when an error occurs
-   */
+  /** Called when an error occurs */
   Error = "error",
 }
 
 interface RadioSong {
-  /**
-   * Song cover image URL
-   */
-  cover: string;
-  /**
-   * Singer name
-   */
+  /** Time, when song started playing (e.g. "14:45") */
+  start_time: string;
+  /** Same as {@link start_time}, but also have seconds (there are exceptions) */
+  start_time_full: string;
+  /** Author/Singer name */
   singer: string;
-  /**
-   * Singer ID
-   */
-  singer_id: string;
-  /**
-   * Singer image URL
-   */
-  singer_img: string;
-  /**
-   * Singer URL
-   */
-  singer_url: string;
-  /**
-   * Song name
-   */
+  /** Song name */
   song: string;
-  /**
-   * Song ID
-   */
-  song_id: string;
-  /**
-   * Song start time (e.g. "13:45:00")
-   */
-  stime: string;
-  /**
-   * Song time (e.g. "13:45")
-   */
-  time: string;
-  /**
-   * Song type (usually empty)
-   */
-  type: string;
-  /**
-   * YouTube video ID
-   */
-  video: string;
 
-  /**
-   * RadioPlayer instance
-   */
+  /** Image URL. If no provided, contains default radio cover URL */
+  image: string;
+  /** Song URL if provided. Can be a YouTube link or direct link to radio website */
+  url: string | null;
+
+  /** RadioPlayer instance */
   player?: RadioPlayer;
 }
 
+/** DJ is only available on HitFM radio station */
 interface RadioDJ {
-  /**
-   * DJ ID
-   */
+  /** DJ ID */
   absnum: string;
-  /**
-   * DJ hours (e.g. "11:00 - 18:00")
-   */
+  /** DJ hours (e.g. "11:00 - 18:00") */
   cur_time: string;
-  /**
-   * DJ type ("dj")
-   */
+  /** DJ type ("dj") */
   djType: string;
-  /**
-   * DJ end hour (e.g. "18:00")
-   */
+  /** DJ end hour (e.g. "18:00") */
   end_time: string;
-  /**
-   * DJ image URL
-   */
+  /** DJ image URL */
   img: string;
-  /**
-   * DJ profile URL (unused on official website)
-   */
+  /** DJ profile URL (unused on official website) */
   link: string;
-  /**
-   * DJ name
-   */
+  /** DJ name */
   title: string;
 
-  /**
-   * RadioPlayer instance
-   */
+  /** RadioPlayer instance */
   player?: RadioPlayer;
 }
