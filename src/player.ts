@@ -9,9 +9,14 @@ export class RadioPlayer {
   playlist?: RadioSong[];
   currentSong?: RadioSong;
   currentDJ?: RadioDJ;
+  private _isPlaying: boolean = false;
   private _updateInterval?: number | NodeJS.Timer;
   private _eventManager: EventEmitter;
   private _setSongEvent: boolean = false;
+
+  get isPlaying(): boolean {
+    return this._isPlaying;
+  }
 
   constructor(options: RadioPlayerOptions) {
     if (!options.station) throw new Error("No radio station provided");
@@ -29,6 +34,9 @@ export class RadioPlayer {
 
   /** Start updating the playlist data */
   start(): void {
+    if (this._isPlaying) return;
+
+    this._isPlaying = true;
     this._updateInterval = setInterval(() => {
       this.update();
     }, this.refreshTime);
@@ -37,8 +45,9 @@ export class RadioPlayer {
 
   /** Stop updating the playlist data */
   stop(): void {
-    if (!this._updateInterval) return;
+    if (!this._isPlaying) return;
     clearInterval(this._updateInterval);
+    this._isPlaying = false;
   }
 
   /**

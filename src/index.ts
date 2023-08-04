@@ -1,4 +1,4 @@
 import { RadioPlayer, RadioPlayerEvent } from "./player";
-import { RadioStation } from "./stations";
+import { RadioStation, RadioPlayerURL } from "./stations";
 
-export { RadioPlayer, RadioPlayerEvent, RadioStation };
+export { RadioPlayer, RadioPlayerEvent, RadioStation, RadioPlayerURL };
